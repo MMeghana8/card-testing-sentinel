@@ -22,31 +22,29 @@ The result can be increased payment failures, unnecessary merchant exposure, and
 
 **Card-Testing Sentinel** converts raw payment transactions into behavioral time windows, calculates an explainable risk score, identifies coordinated attack clusters, and generates bounded response recommendations.
 
-The system follows:
+> ⚠️ **Note on data:** All transactions used in this project are **synthetically generated** to simulate normal payment behavior and injected card-testing-attack patterns, since real merchant transaction data is not publicly available. Metrics below reflect performance on this synthetic dataset.
 
-```
+The system follows:
 Raw Transactions
-       ↓
+↓
 Behavioral Windows
-       ↓
+↓
 Risk Detection
-       ↓
+↓
 Suspicious Transactions
-       ↓
+↓
 Attack Clustering
-       ↓
+↓
 Attack Explanation
-       ↓
+↓
 Bounded Recommendation
-       ↓
+↓
 Human Approval
-       ↓
-Action (Razorpay Test Mode)
-```
+↓
+Action
+
 
 The system is designed to **recommend** defensive actions rather than automatically blocking transactions.
-
-> ⚠️ **Note on data:** All transactions used in this project are **synthetically generated** to simulate normal payment behavior and injected card-testing-attack patterns, since real merchant transaction data is not publicly available. Metrics below reflect performance on this synthetic dataset.
 
 ---
 
@@ -64,7 +62,7 @@ Analyzes transaction behavior using:
 Each window receives an explainable 0–100 risk score.
 
 ### 2. Coordinated Attack Clustering
-Suspicious transactions are grouped using shared behavioral and infrastructure signals, helping identify attacks that span merchants, devices, IP addresses, and card BINs — distinguishing coordinated rings from random unrelated failures.
+Suspicious transactions are grouped using shared behavioral and infrastructure signals, helping identify attacks that span merchants, devices, IP addresses, and card BINs.
 
 ### 3. Explainable Risk Analysis
 Instead of only producing a risk score, Sentinel explains *why* activity was flagged — e.g., high failure rate, high low-value concentration, rapid transaction volume, shared infrastructure.
@@ -74,9 +72,6 @@ Generates controlled recommendations such as `PAUSE_SUSPECTED_BIN` or `RATE_LIMI
 
 ### 5. Safety Controls
 Sentinel follows a human-in-the-loop architecture. Automatic blocking is disabled by design.
-
-### 6. Razorpay Test Mode Integration
-On analyst approval, the recommended action is executed as a safe, auditable call against Razorpay's Test Mode API — proving the loop closes into a real action rather than staying a theoretical model.
 
 ---
 
@@ -103,7 +98,7 @@ Held-out test set performance:
 | F1 Score | 87.01% |
 | Threshold | 79 |
 
-**Honest false-positive cost:** At threshold 79, roughly 8.4% of flagged windows are false positives (based on the precision above). On a merchant processing 100,000 transactions/day, this could mean a small percentage of genuine low-value transactions being held for review rather than instantly approved — a real, quantifiable trade-off rather than a hidden one. *(Replace this estimate with your own computed false-positive rate × average transaction value once you calculate it from your confusion matrix.)*
+**Honest trade-off:** At the current threshold, some genuine transactions are flagged for review rather than instantly approved — a real trade-off between catching attacks and disrupting legitimate customers, reported here rather than hidden.
 
 ---
 
@@ -120,7 +115,7 @@ The risk score combines six behavioral signals:
 | Unique IPs | 5% |
 | Unique BINs | 5% |
 
-Production threshold: **Risk Score ≥ 79**, generated using percentile-based comparison against baseline behavior. This makes the system explainable, auditable, threshold-driven, and suitable for behavioral anomaly detection.
+Production threshold: **Risk Score ≥ 79**, generated using percentile-based comparison against baseline behavior. This makes the system explainable, auditable, and threshold-driven.
 
 ---
 
@@ -138,59 +133,43 @@ This reduces the risk of false-positive operational impact and keeps a full audi
 
 ## 🔧 What Broke & How I Fixed It
 
-- Initial clustering grouped unrelated transactions together → fixed by tightening the shared-BIN similarity threshold in `clusterer.py`.
-- Risk score was initially too sensitive to raw transaction count alone, causing high-traffic-but-legitimate windows to be flagged → rebalanced signal weights (see table above) to reduce false positives.
-- Early version allowed the system to auto-execute recommendations → redesigned around a mandatory human-approval gate to keep the system strictly defense-only.
+- Initial clustering grouped unrelated transactions together → fixed by tightening the shared-signal similarity threshold in the clustering logic.
+- Risk score was initially too sensitive to raw transaction count alone, causing high-traffic-but-legitimate windows to be flagged → rebalanced the six signal weights shown above to reduce false positives.
+- Early design allowed the system to act on its own → redesigned around a mandatory human-approval gate to keep the system strictly defense-only.
 
-*(Add any further real issues you hit — this section is what Razorpay explicitly asks every submission to include.)*
+---
+
+## ⚠️ Known Limitations / Future Work
+
+- Live Razorpay Test Mode API execution is designed into the architecture but not yet wired into the action engine — approved actions are currently logged, not auto-executed against the API.
+- Evaluated only on synthetic data; real merchant data would likely surface additional edge cases not represented here.
 
 ---
 
 ## 🏗️ Project Architecture
 
-```
 card-testing-sentinel/
 │
-├── dashboard/
-│   └── app.py
-│
-├── data/
-│   ├── transactions.csv
-│   └── results/
-│       ├── detected_windows.csv
-│       ├── suspicious_transactions.csv
-│       ├── clustered_transactions.csv
-│       ├── cluster_summary.csv
-│       └── action_recommendations.csv
-│
-├── notebooks/
-│   └── 01_data_exploration.ipynb
-│
-├── src/
-│   ├── data_generator.py
-│   ├── detector.py
-│   ├── clusterer.py
-│   ├── action_engine.py
-│   ├── razorpay_client.py
-│   └── sentinel.py
-│
-├── tests/
-│   ├── test_detector.py
-│   ├── test_clusterer.py
-│   └── test_action_engine.py
-│
+├── README.md
 ├── requirements.txt
 ├── .gitignore
-└── README.md
-```
+├── 01_data_exploration.ipynb
+├── app.py
+├── data_generator.py
+├── detector.py
+├── clusterer.py
+├── action_engine.py
+├── sentinel.py
+├── test_detector.py
+├── test_clusterer.py
+└── test_action_engine.py
 
-> **Note:** reorganize your actual repo files to match this structure (currently they sit flat in the root) so the README and the real repo agree.
 
 ---
 
 ## ⚙️ Tech Stack
 
-Python · Pandas · NumPy · Scikit-learn · NetworkX · Streamlit · Matplotlib · Razorpay API (Test Mode) · Git · GitHub
+Python · Pandas · NumPy · Scikit-learn · Streamlit · Matplotlib · Git · GitHub
 
 ---
 
@@ -200,9 +179,7 @@ Python · Pandas · NumPy · Scikit-learn · NetworkX · Streamlit · Matplotlib
 git clone https://github.com/MMeghana8/card-testing-sentinel.git
 cd card-testing-sentinel
 python -m venv venv
-source venv/bin/activate      # Windows: venv\Scripts\activate
+venv\Scripts\activate      # Mac/Linux: source venv/bin/activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
-
----
